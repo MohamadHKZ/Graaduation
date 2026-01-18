@@ -6,10 +6,13 @@ import Alert from '../../components/Alert';
 import Checkbox from '../../components/Checkbox';
 import SkillsInput from '../../components/SkillsInput';
 import UserInfo from '../../components/UserInfo';
+import CVUpload from '../../components/CVUpload';
 
 const ProfileUser = ({ user, token, onLogout }) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
+  const [cvFile, setCvFile] = useState(null);
+  const [currentCV, setCurrentCV] = useState('');
   
   const [technicalSkills, setTechnicalSkills] = useState(['']);
   const [jobPositionSkills, setJobPositionSkills] = useState(['']);
@@ -29,6 +32,9 @@ const ProfileUser = ({ user, token, onLogout }) => {
           setJobPositionSkills(profile.jobPositionSkills || ['']);
           setFieldSkills(profile.fieldSkills || ['']);
           setSoftSkills(profile.softSkills || ['']);
+          if (profile.cvFileName) {
+            setCurrentCV(profile.cvFileName);
+          }
         }
       } catch (err) {
         console.log('No existing profile found');
@@ -40,12 +46,22 @@ const ProfileUser = ({ user, token, onLogout }) => {
     }
   }, [token, user]);
 
+  const handleCVSelect = (file) => {
+    setCvFile(file);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage({ text: '', type: '' });
 
     const formData = new FormData(e.target);
+    
+    // Add CV file if selected
+    if (cvFile) {
+      formData.append('cv', cvFile);
+    }
+    
     formData.append('technicalSkills', JSON.stringify(technicalSkills.filter(s => s.trim())));
     formData.append('jobPositionSkills', JSON.stringify(jobPositionSkills.filter(s => s.trim())));
     formData.append('fieldSkills', JSON.stringify(fieldSkills.filter(s => s.trim())));
@@ -57,6 +73,10 @@ const ProfileUser = ({ user, token, onLogout }) => {
       if (!profileId && result.id) {
         setProfileId(result.id);
         localStorage.setItem('profileId', result.id);
+      }
+      
+      if (result.cvFileName) {
+        setCurrentCV(result.cvFileName);
       }
       
       setMessage({ text: 'Profile updated', type: 'success' });
@@ -76,6 +96,8 @@ const ProfileUser = ({ user, token, onLogout }) => {
       <Alert message={message.text} type={message.type} />
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <CVUpload onFileSelect={handleCVSelect} currentCV={currentCV} />
+
         <Input
           type="text"
           name="seekedJobTitle"
