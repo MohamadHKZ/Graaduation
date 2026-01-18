@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { updateProfile, getProfile } from '../../api/profile';
+import { updateProfile, getProfile,getProfileIdForUser } from '../../api/profile';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
 import Alert from '../../components/Alert';
@@ -7,29 +7,41 @@ import Checkbox from '../../components/Checkbox';
 import SkillsInput from '../../components/SkillsInput';
 import UserInfo from '../../components/UserInfo';
 
-const ProfileUser = ({ user, token, onLogout }) => {
+const ProfileUser = ({ user, token }) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
-  
+ 
+  const [jobTitle, setJobTitle] = useState('');
   const [technicalSkills, setTechnicalSkills] = useState(['']);
   const [jobPositionSkills, setJobPositionSkills] = useState(['']);
   const [fieldSkills, setFieldSkills] = useState(['']);
   const [softSkills, setSoftSkills] = useState(['']);
   const [profileId, setProfileId] = useState(null);
+  const [experience, setExperience] = useState('');
+  const [receiveNotifications, setReceiveNotifications] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const storedProfileId = localStorage.getItem('profileId');
+        if(!localStorage.getItem('profileId')){
+          const profileIdForCurrentUser = await getProfileIdForUser(token, user.jobSeekerId);
+          if(profileIdForCurrentUser){
+            localStorage.setItem('profileId', profileIdForCurrentUser);
+          }
+        }
+        const storedProfileId = localStorage.getItem('profileId');        
         if (storedProfileId && user?.jobSeekerId) {
-          const profile = await getProfile(token, user.jobSeekerId, storedProfileId);
-          
-          setProfileId(profile.id);
+          const profile = await getProfile(token, storedProfileId);
+          setJobTitle(profile.seekedJobTitle || '');
+          setProfileId(profile.profileId);
           setTechnicalSkills(profile.technicalSkills || ['']);
           setJobPositionSkills(profile.jobPositionSkills || ['']);
           setFieldSkills(profile.fieldSkills || ['']);
           setSoftSkills(profile.softSkills || ['']);
+          setExperience(profile.experience || '');
+          setReceiveNotifications(profile.receiveNotifications || false);
         }
+      // eslint-disable-next-line no-unused-vars
       } catch (err) {
         console.log('No existing profile found');
       }
@@ -46,18 +58,23 @@ const ProfileUser = ({ user, token, onLogout }) => {
     setMessage({ text: '', type: '' });
 
     const formData = new FormData(e.target);
+    formData.append('seekedJobTitle', jobTitle);
     formData.append('technicalSkills', JSON.stringify(technicalSkills.filter(s => s.trim())));
     formData.append('jobPositionSkills', JSON.stringify(jobPositionSkills.filter(s => s.trim())));
     formData.append('fieldSkills', JSON.stringify(fieldSkills.filter(s => s.trim())));
     formData.append('softSkills', JSON.stringify(softSkills.filter(s => s.trim())));
+    formData.append('experience', experience);
+    formData.append('receiveNotifications', receiveNotifications);
 
     try {
       const result = await updateProfile(formData, token, user.jobSeekerId, profileId);
 
-      if (!profileId && result.id) {
-        setProfileId(result.id);
-        localStorage.setItem('profileId', result.id);
+      if (!profileId && result.profileId) {
+        setProfileId(result.profileId);
+        localStorage.setItem('profileId', result.profileId);
       }
+      
+
       
       setMessage({ text: 'Profile updated', type: 'success' });
     } catch (err) {
@@ -81,6 +98,8 @@ const ProfileUser = ({ user, token, onLogout }) => {
           name="seekedJobTitle"
           required
           placeholder="Seeked Job Title"
+          value={jobTitle}
+          onChange={(e) => setJobTitle(e.target.value)}
         />
 
         <SkillsInput 
@@ -110,13 +129,16 @@ const ProfileUser = ({ user, token, onLogout }) => {
         <Input
           type="text"
           name="experience"
-          required
           placeholder="Experience"
+          value={experience}
+          onChange={(e) => setExperience(e.target.value)}
         />
 
         <Checkbox 
-          name="notifications" 
-          label="Receive job notifications" 
+          name="receiveNotifications" 
+          label="Receive job notifications"
+          checked={receiveNotifications}
+          onChange={(e) => setReceiveNotifications(e.target.checked)} 
         />
 
         <Button
